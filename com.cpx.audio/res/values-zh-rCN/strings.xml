@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="hello">Hello World, MainActivity!</string>
+    <string name="app_name">音频管理</string>
+    <string name="operate_title">文件操作</string>
+    <string-array name="categories">
+    	<item>文件夹</item>
+    	<item>音乐</item>
+    	<item>视频</item>
+    	<item>图片</item>
+    	<item>文档</item>
+    	<item>上传</item>
+    </string-array>
+    <string-array name="folder_operates">
+    	<item>删除</item>
+    	<item>重命名</item>
+    	<item>新建文件夹</item>
+    	<item>剪切</item>
+    	<item>粘贴</item>
+    	<item>属性</item>
+    	<item>粘贴进去</item>
+    </string-array>
+    <string-array name="file_operates">
+    	<item>删除</item>
+    	<item>重命名</item>
+    	<item>新建文件夹</item>
+    	<item>剪切</item>
+    	<item>粘贴</item>
+    	<item>属性</item>
+    	<item>下载</item>
+    </string-array>
+</resources>

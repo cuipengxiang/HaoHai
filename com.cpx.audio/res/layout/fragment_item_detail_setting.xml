@@ -1,0 +1,95 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#EDEFF9"
+    android:orientation="vertical" >
+
+    <RelativeLayout
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:padding="20dip" >
+
+        <TextView
+            android:id="@+id/setting_save_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentLeft="true"
+            android:layout_centerVertical="true"
+            android:layout_marginLeft="10dip"
+            android:text="默认保存路径："
+            android:textColor="#999999"
+            android:textSize="22sp" />
+
+        <Button
+            android:id="@+id/setting_save_button"
+            android:layout_width="115dip"
+            android:layout_height="53dip"
+            android:layout_alignParentRight="true"
+            android:layout_centerVertical="true"
+            android:background="@drawable/btn_rect_bg"
+            android:layout_marginRight="10dip"
+            android:text="修 改"
+            android:textColor="#3F67BF"
+            android:textSize="20sp" />
+
+        <TextView
+            android:id="@+id/setting_save_edit"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_toLeftOf="@id/setting_save_button"
+            android:layout_toRightOf="@id/setting_save_text"
+            android:textColor="#666666"
+            android:textSize="22sp" />
+    </RelativeLayout>
+
+    <TextView
+        android:layout_width="fill_parent"
+        android:layout_height="1dip"
+        android:background="#A7B3CC" />
+
+    <RelativeLayout
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:padding="20dip" >
+
+        <TextView
+            android:id="@+id/setting_send_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentLeft="true"
+            android:layout_centerVertical="true"
+            android:layout_marginLeft="10dip"
+            android:text="默认发送路径："
+            android:textColor="#999999"
+            android:textSize="22sp" />
+
+        <Button
+            android:id="@+id/setting_send_button"
+            android:layout_width="115dip"
+            android:layout_height="53dip"
+            android:layout_alignParentRight="true"
+            android:layout_centerVertical="true"
+            android:background="@drawable/btn_rect_bg"
+            android:layout_marginRight="10dip"
+            android:text="修 改"
+            android:textColor="#3F67BF"
+            android:textSize="20sp" />
+
+        <TextView
+            android:id="@+id/setting_send_edit"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_toLeftOf="@id/setting_send_button"
+            android:layout_toRightOf="@id/setting_send_text"
+            android:textColor="#666666"
+            android:textSize="22sp" />
+    </RelativeLayout>
+
+    <TextView
+        android:layout_width="fill_parent"
+        android:layout_height="1dip"
+        android:background="#A7B3CC" />
+
+</LinearLayout>

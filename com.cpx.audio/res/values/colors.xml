@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<color name="item_selected_blue">#56B6E9</color>
+	<color name="white">#FFFFFF</color>
+	<color name="fragment_list_item_normal">#0F112A</color>
+	<color name="fragment_list_item_selected">#232850</color>
+	<color name="gray">#DBE1ED</color>
+</resources>
