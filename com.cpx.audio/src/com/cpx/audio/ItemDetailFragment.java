@@ -6,6 +6,7 @@ import it.sauronsoftware.ftp4j.FTPDataTransferException;
 import it.sauronsoftware.ftp4j.FTPDataTransferListener;
 import it.sauronsoftware.ftp4j.FTPException;
 import it.sauronsoftware.ftp4j.FTPIllegalReplyException;
+import it.sauronsoftware.ftp4j.FTPListParseException;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -22,6 +23,7 @@ import java.util.Map;
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.app.AlertDialog.Builder;
+import android.app.Dialog;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
@@ -53,7 +55,6 @@ import com.cpx.audio.util.FileUtil;
 import com.huaxun.ftp.DB.ServerFileDBUtil;
 import com.huaxun.ftp.base.Constants;
 import com.huaxun.ftp.base.ServerFile;
-import com.huaxun.ftp.tools.FTPFileOperateUtil;
 import com.huaxun.ftp.tools.FTPUtil;
 
 /**
@@ -79,6 +80,8 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 	private Button reStartPlay;
 	private File selectedFile;
 
+	private Dialog progressDialog;
+	
 	final String SAVE_PATH = "save";
 	final String SAVE_PATH_KEY = "save_key";
 	final String SEND_PATH = "send";
@@ -106,8 +109,8 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 	private String FTP_UserName = "audio";
 	private String FTP_PassWord = "audio";
 
-	private boolean uploadcompleted = false;
-	private boolean hasConfirmed = false;
+	// private boolean uploadcompleted = false;
+	// private boolean hasConfirmed = false;
 
 	/**
 	 * The fragment argument representing the item ID that this fragment
@@ -425,14 +428,14 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 					}
 				}
 				AlertDialog.Builder builder = new Builder(getActivity());
-				builder.setMessage("确定选择：" + '\n' + newFile.getAbsolutePath() + "？");
+				builder.setMessage("确定上传：" + '\n' + newFile.getAbsolutePath() + "？");
 				builder.setTitle("选择文件");
 				builder.setPositiveButton("确认", new DialogInterface.OnClickListener() {
 
 					@Override
 					public void onClick(DialogInterface dialog, int which) {
+						progressDialog = showProgressDialog();
 						FTPClientUpLoad(newFile);
-						showPlayDialog(newFile);
 						dialog.dismiss();
 					}
 				});
@@ -544,6 +547,17 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 		});
 	}
 
+	public Dialog showProgressDialog() {
+		LinearLayout progressLayout = (LinearLayout) mInflater.inflate(R.layout.progress_dialog_view, null);
+		AlertDialog.Builder builder = new Builder(getActivity());
+		builder.setTitle("提示");
+		builder.setView(progressLayout);
+		builder.setCancelable(false);
+		AlertDialog dialog = builder.create();
+		dialog.show();
+		return dialog;
+	}
+
 	public void showPlayDialog(final File newFile) {
 		AlertDialog.Builder builder = new Builder(getActivity());
 		builder.setMessage("确认要播放 " + newFile.getAbsolutePath() + "吗？");
@@ -552,17 +566,11 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 
 			@Override
 			public void onClick(DialogInterface dialog, int which) {
-				if (uploadcompleted) {
-					Log.d(">>>>>>>>>>>>>>", "upload was completed");
-					byte[] filename = (Constants.DEFAULT_UPLOAD_PATH + newFile.getName()).getBytes();
-					byte[] cmd = new byte[CMD.BEGIN_PLAY.length + filename.length];
-					System.arraycopy(CMD.BEGIN_PLAY, 0, cmd, 0, CMD.BEGIN_PLAY.length);
-					System.arraycopy(filename, 0, cmd, CMD.BEGIN_PLAY.length, filename.length);
-					sendSocketCMD(cmd);
-					uploadcompleted = false;
-				} else {
-					hasConfirmed = true;
-				}
+				byte[] filename = (Constants.DEFAULT_UPLOAD_PATH + newFile.getName()).getBytes();
+				byte[] cmd = new byte[CMD.BEGIN_PLAY.length + filename.length];
+				System.arraycopy(CMD.BEGIN_PLAY, 0, cmd, 0, CMD.BEGIN_PLAY.length);
+				System.arraycopy(filename, 0, cmd, CMD.BEGIN_PLAY.length, filename.length);
+				sendSocketCMD(cmd);
 			}
 		});
 
@@ -827,7 +835,7 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 
 		builder.create().show();
 	}
-	
+
 	public void delete(File file) {
 		if (file.isFile()) {
 			file.delete();
@@ -1014,7 +1022,7 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 
 	public Handler mHandler = new Handler() {
 		public void handleMessage(Message msg) {
-			
+
 		};
 	};
 
@@ -1126,17 +1134,38 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 				// TODO Auto-generated method stub
 				serverDBUtil = new ServerFileDBUtil(getActivity());
 				ftpUtil = new FTPUtil(getActivity(), serverDBUtil);
-				ftpClient = ftpUtil.login(FTP_HOST, FTP_PORT, FTP_UserName, FTP_PassWord);// "172.16.4.2",
-																							// 21,
-																							// "jiaodongav",
-																							// "av1.jiaodong.net.cn");
+				ftpClient = ftpUtil.login(FTP_HOST, FTP_PORT, FTP_UserName, FTP_PassWord);
 				File workSpace = new File(Constants.workSpace);
 				if (!workSpace.exists())
 					workSpace.mkdirs();
 				refreshDB();
 				if (ftpClient != null) {
 					try {
-						ftpClient.changeDirectory(Constants.DEFAULT_UPLOAD_PATH);// "/TV/news/");
+						ftpClient.changeDirectory(Constants.DEFAULT_UPLOAD_PATH);
+						String[] remoteFiles = ftpClient.listNames();
+						for (int i = 0; i < remoteFiles.length; i++) {
+							if (remoteFiles[i].equals(file.getName())) {
+								Message message = mUpLoadHandler.obtainMessage(0);
+								message.obj = file;
+								mUpLoadHandler.sendMessage(message);
+								try {
+									ftpClient.disconnect(true);
+								} catch (IllegalStateException e) {
+									// TODO Auto-generated catch block
+									e.printStackTrace();
+								} catch (IOException e) {
+									// TODO Auto-generated catch block
+									e.printStackTrace();
+								} catch (FTPIllegalReplyException e) {
+									// TODO Auto-generated catch block
+									e.printStackTrace();
+								} catch (FTPException e) {
+									// TODO Auto-generated catch block
+									e.printStackTrace();
+								}
+								return;
+							}
+						}
 						ftpClient.upload(file, new FTPDataTransferListener() {
 
 							@Override
@@ -1160,19 +1189,9 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 							@Override
 							public void completed() {
 								// TODO Auto-generated method stub
-								Log.d(">>>>>>>>>>>>>", "update complete");
-								if (hasConfirmed) {
-									Log.d(">>>>>>>>>>>>>", "has Confirmed");
-									byte[] filename = (Constants.DEFAULT_UPLOAD_PATH + file.getName()).getBytes();
-									byte[] cmd = new byte[CMD.BEGIN_PLAY.length + filename.length];
-									System.arraycopy(CMD.BEGIN_PLAY, 0, cmd, 0, CMD.BEGIN_PLAY.length);
-									System.arraycopy(filename, 0, cmd, CMD.BEGIN_PLAY.length, filename.length);
-									sendSocketCMD(cmd);
-									hasConfirmed = false;
-								} else {
-									uploadcompleted = true;
-									Log.d(">>>>>>>>>>>>>", "uploadcompleted = true");
-								}
+								Message message = mUpLoadHandler.obtainMessage(0);
+								message.obj = file;
+								mUpLoadHandler.sendMessage(message);
 								try {
 									ftpClient.disconnect(true);
 								} catch (IllegalStateException e) {
@@ -1208,19 +1227,25 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 						e.printStackTrace();
 					} catch (FTPException e) {
 						e.printStackTrace();
+					} catch (FTPListParseException e1) {
+						// TODO Auto-generated catch block
+						e1.printStackTrace();
 					}
-
-					/*
-					 * Map<String, String> item = new HashMap<String, String>();
-					 * item.put(Constants.TYPE_UPLOAD, file.getAbsolutePath());
-					 * ftpUtil.setFile(item);
-					 * ftpUtil.setUploadPath(Constants.DEFAULT_UPLOAD_PATH);
-					 * ftpUtil.preTransFile();
-					 */
 				}
 			}
 		}).start();
 	}
+
+	Handler mUpLoadHandler = new Handler() {
+		public void handleMessage(Message msg) {
+			if (progressDialog != null) {
+				progressDialog.dismiss();
+			}
+			File file = (File) msg.obj;
+			Log.d(">>>>>>>>>>", file + "");
+			showPlayDialog(file);
+		};
+	};
 
 	/**
 	 * 更新数据库，删除不存在的文件
