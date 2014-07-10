@@ -39,12 +39,15 @@ import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
 import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.Socket;
+import java.net.SocketException;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.StringTokenizer;
 import java.util.regex.Matcher;
@@ -53,6 +56,8 @@ import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
 
 import javax.net.ssl.SSLSocketFactory;
+
+import org.apache.http.conn.util.InetAddressUtils;
 
 import android.util.Log;
 
@@ -242,7 +247,7 @@ public class FTPClient {
 	 * The flag for the passive FTP data transfer mode. Default value is true,
 	 * cause it's usually the preferred FTP operating mode.
 	 */
-	private boolean passive = true;
+	private boolean passive = false;
 
 	/**
 	 * The type of the data transfer contents (auto, textual, binary). The value
@@ -3590,6 +3595,11 @@ public class FTPClient {
 		int p1 = port >>> 8;
 		int p2 = port & 0xff;
 		int[] addr = pickLocalAddress();
+		String addrString = "";
+		for (int i = 0; i < addr.length; i++) {
+			addrString = addrString + addr[i];
+		}
+		Log.d(">>>>>>>>>>>>>", addrString);
 		// Send the port command.
 		communication.sendFTPCommand("PORT " + addr[0] + "," + addr[1] + "," + addr[2] + "," +
 				addr[3] + "," + p1 + "," + p2);
@@ -3750,6 +3760,7 @@ public class FTPClient {
 		int[] ret = pickForcedLocalAddress();
 		// Auto-detect?
 		if (ret == null) {
+			Log.d(">>>>>>>>>>>>>>", "AutoDectedLocalAddress");
 			ret = pickAutoDetectedLocalAddress();
 		}
 		// Returns.
@@ -3799,6 +3810,40 @@ public class FTPClient {
 		return ret;
 	}
 
+	public InetAddress getLocalHostIp()
+    {
+        try
+        {
+            Enumeration<NetworkInterface> en = NetworkInterface
+                    .getNetworkInterfaces();
+            // 遍历所用的网络接口
+            while (en.hasMoreElements())
+            {
+                NetworkInterface nif = en.nextElement();// 得到每一个网络接口绑定的所有ip
+                Enumeration<InetAddress> inet = nif.getInetAddresses();
+                // 遍历每一个接口绑定的所有ip
+                while (inet.hasMoreElements())
+                {
+                    InetAddress ip = inet.nextElement();
+                    if (!ip.isLoopbackAddress()
+                            && InetAddressUtils.isIPv4Address(ip
+                                    .getHostAddress()))
+                    {
+                        return ip;
+                    }
+                }
+
+            }
+        }
+        catch (SocketException e)
+        {
+            Log.e(">>>>>>>>>", "获取本地ip地址失败");
+            e.printStackTrace();
+        }
+        return null;
+
+    }
+	
 	/**
 	 * Auto-detects the local network address, and returns it in the form of a 4
 	 * elements integer array.
@@ -3809,7 +3854,8 @@ public class FTPClient {
 	 *             local address.
 	 */
 	private int[] pickAutoDetectedLocalAddress() throws IOException {
-		InetAddress addressObj = InetAddress.getLocalHost();
+		//InetAddress addressObj = InetAddress.getLocalHost();
+		InetAddress addressObj = getLocalHostIp();
 		byte[] addr = addressObj.getAddress();
 		int b1 = addr[0] & 0xff;
 		int b2 = addr[1] & 0xff;

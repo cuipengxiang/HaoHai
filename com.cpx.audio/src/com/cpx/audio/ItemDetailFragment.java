@@ -8,11 +8,10 @@ import it.sauronsoftware.ftp4j.FTPException;
 import it.sauronsoftware.ftp4j.FTPIllegalReplyException;
 import it.sauronsoftware.ftp4j.FTPListParseException;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -41,6 +40,7 @@ import android.widget.AdapterView.OnItemClickListener;
 import android.widget.AdapterView.OnItemLongClickListener;
 import android.widget.BaseAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -62,7 +62,7 @@ import com.huaxun.ftp.tools.FTPUtil;
  * contained in a {@link ItemListActivity} in two-pane mode (on tablets) or a
  * {@link ItemDetailActivity} on handsets.
  */
-@SuppressLint({ "SdCardPath", "HandlerLeak" })
+@SuppressLint({ "SdCardPath", "HandlerLeak", "DefaultLocale" })
 public class ItemDetailFragment extends Fragment implements Runnable {
 	private ListView fileListView;
 	private File currentParent;
@@ -79,9 +79,10 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 	private Button stopPlay;
 	private Button reStartPlay;
 	private File selectedFile;
+	private CheckBox repeatPlay;
 
 	private Dialog progressDialog;
-	
+
 	final String SAVE_PATH = "save";
 	final String SAVE_PATH_KEY = "save_key";
 	final String SEND_PATH = "send";
@@ -99,9 +100,9 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 
 	Thread mSocketThread;
 	Socket mSocket;
-	private BufferedReader in = null;
+	private InputStream in = null;
 	private OutputStream out = null;
-	String socketBack;
+	byte[] socketBack;
 
 	private FTPClient ftpClient;
 	private FTPUtil ftpUtil;
@@ -403,6 +404,7 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 		currentRoute = (TextView) rootView.findViewById(R.id.send_route_edit);
 		currentRoute.setText(currentParent.getAbsolutePath());
 		currentFile = (TextView) rootView.findViewById(R.id.play_file_edit);
+		repeatPlay = (CheckBox) rootView.findViewById(R.id.play_repeat);
 
 		beginPlay = (Button) rootView.findViewById(R.id.begin_play_button);
 		stopPlay = (Button) rootView.findViewById(R.id.stop_play_button);
@@ -566,11 +568,20 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 
 			@Override
 			public void onClick(DialogInterface dialog, int which) {
-				byte[] filename = (Constants.DEFAULT_UPLOAD_PATH + newFile.getName()).getBytes();
-				byte[] cmd = new byte[CMD.BEGIN_PLAY.length + filename.length];
-				System.arraycopy(CMD.BEGIN_PLAY, 0, cmd, 0, CMD.BEGIN_PLAY.length);
-				System.arraycopy(filename, 0, cmd, CMD.BEGIN_PLAY.length, filename.length);
-				sendSocketCMD(cmd);
+				if (repeatPlay.isChecked()) {
+					// 循环播放
+					byte[] filename = (Constants.DEFAULT_UPLOAD_PATH + newFile.getName()).getBytes();
+					byte[] cmd = new byte[CMD.BEGIN_PLAY.length + filename.length];
+					System.arraycopy(CMD.BEGIN_PLAY, 0, cmd, 0, CMD.BEGIN_PLAY.length);
+					System.arraycopy(filename, 0, cmd, CMD.BEGIN_PLAY.length, filename.length);
+					sendSocketCMD(cmd);
+				} else {
+					byte[] filename = (Constants.DEFAULT_UPLOAD_PATH + newFile.getName()).getBytes();
+					byte[] cmd = new byte[CMD.BEGIN_PLAY.length + filename.length];
+					System.arraycopy(CMD.BEGIN_PLAY, 0, cmd, 0, CMD.BEGIN_PLAY.length);
+					System.arraycopy(filename, 0, cmd, CMD.BEGIN_PLAY.length, filename.length);
+					sendSocketCMD(cmd);
+				}
 			}
 		});
 
@@ -814,14 +825,7 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 
 			@Override
 			public void onClick(DialogInterface dialog, int which) {
-				new Handler().postDelayed(new Runnable() {
-
-					@Override
-					public void run() {
-						// TODO Auto-generated method stub
-						FTPClientDownLoad(filename);
-					}
-				}, 500);
+				FTPClientDownLoad(filename);
 			}
 		});
 
@@ -998,7 +1002,7 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 			}
 			mSocket = new Socket(HOST, SOCKET_PORT);
 			mSocket.setKeepAlive(true);
-			in = new BufferedReader(new InputStreamReader(mSocket.getInputStream()));
+			in = mSocket.getInputStream();
 			out = mSocket.getOutputStream();
 		} catch (IOException ex) {
 			ex.printStackTrace();
@@ -1007,24 +1011,124 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 			while (true) {
 				if (mSocket.isConnected()) {
 					if (!mSocket.isInputShutdown()) {
-						if ((socketBack = in.readLine()) != null) {
-							socketBack += "\n";
-							mHandler.sendMessage(mHandler.obtainMessage());
+						socketBack = new byte[4];
+						if (in.read(socketBack) > -1) {
+							Message socketMessage = mHandler.obtainMessage(0);
+							socketMessage.obj = socketBack;
+							mHandler.sendMessage(socketMessage);
 						}
 					}
 				}
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
-			mSocket = null;
 		}
 	}
 
 	public Handler mHandler = new Handler() {
 		public void handleMessage(Message msg) {
-
+			String msgString = bytesToHexString((byte[]) msg.obj);
+			String status = msgString.substring(4, 8);
+			String replycode = msgString.substring(0, 4);
+			Toast.makeText(getActivity(), getCodeStatusString(replycode, status), Toast.LENGTH_LONG).show();
 		};
 	};
+	
+	public String getCodeStatusString(String reply, String status) {
+		String code_status = "命令返回值：";
+		if (reply.equals(CMD.RET_DEVICE)) {
+			code_status = code_status + CMD.RET_DEVICE_STRING;
+		} else if (reply.equals(CMD.RET_ERRTIME)) {
+			code_status = code_status + CMD.RET_ERRTIME_STRING;
+		} else if (reply.equals(CMD.RET_FILEERROR)) {
+			code_status = code_status + CMD.RET_FILEERROR_STRING;
+		} else if (reply.equals(CMD.RET_MEM)) {
+			code_status = code_status + CMD.RET_MEM_STRING;
+		} else if (reply.equals(CMD.RET_NODEF)) {
+			code_status = code_status + CMD.RET_NODEF_STRING;
+		} else if (reply.equals(CMD.RET_OK)) {
+			code_status = code_status + CMD.RET_OK_STRING;
+		} else if (reply.equals(CMD.RET_OTHER)) {
+			code_status = code_status + CMD.RET_OTHER_STRING;
+		} else if (reply.equals(CMD.RET_FMTERROR)) {
+			code_status = code_status + CMD.RET_FMTERROR_STRING;
+		} else {
+			code_status = code_status + "未知";
+		}
+		code_status = code_status + "，状态返回值：";
+		if (status.equals(CMD.sIDLE)) {
+			code_status = code_status + CMD.sIDLE_STRING;
+		} else if (status.equals(CMD.sPL_NORM)) {
+			code_status = code_status + CMD.sPL_NORM_STRING;
+		} else if (status.equals(CMD.sPL_PAUSE)) {
+			code_status = code_status + CMD.sPL_PAUSE_STRING;
+		} else if (status.equals(CMD.sRC_NORM)) {
+			code_status = code_status + CMD.sRC_NORM_STRING;
+		} else if (status.equals(CMD.sRC_PAUSE)) {
+			code_status = code_status + CMD.sRC_PAUSE_STRING;
+		} else if (status.equals(CMD.sRC_STOP)) {
+			code_status = code_status + CMD.sRC_STOP_STRING;
+		}
+
+		return code_status;
+	}
+
+	/*
+	 * Convert byte[] to hex
+	 * string.这里我们可以将byte转换成int，然后利用Integer.toHexString(int)来转换成16进制字符串。
+	 * 
+	 * @param src byte[] data
+	 * 
+	 * @return hex string
+	 */
+	public static String bytesToHexString(byte[] src) {
+		StringBuilder stringBuilder = new StringBuilder("");
+		if (src == null || src.length <= 0) {
+			return null;
+		}
+		for (int i = 0; i < src.length; i++) {
+			int v = src[i] & 0xFF;
+			String hv = Integer.toHexString(v);
+			if (hv.length() < 2) {
+				stringBuilder.append(0);
+			}
+			stringBuilder.append(hv);
+		}
+		return stringBuilder.toString();
+	}
+
+	/**
+	 * Convert hex string to byte[]
+	 * 
+	 * @param hexString
+	 *            the hex string
+	 * @return byte[]
+	 */
+	public static byte[] hexStringToBytes(String hexString) {
+		if (hexString == null || hexString.equals("")) {
+			return null;
+		}
+		hexString = hexString.toUpperCase();
+		int length = hexString.length() / 2;
+		char[] hexChars = hexString.toCharArray();
+		byte[] d = new byte[length];
+		for (int i = 0; i < length; i++) {
+			int pos = i * 2;
+			d[i] = (byte) (charToByte(hexChars[pos]) << 4 | charToByte(hexChars[pos + 1]));
+		}
+		return d;
+	}
+
+	/**
+	 * Convert char to byte
+	 * 
+	 * @param c
+	 *            char
+	 * @return byte
+	 */
+	private static byte charToByte(char c) {
+		return (byte) "0123456789ABCDEF".indexOf(c);
+	}
 
 	public void FTPClientDownLoad(final String fileName) {
 		new Thread(new Runnable() {
@@ -1231,6 +1335,10 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 						// TODO Auto-generated catch block
 						e1.printStackTrace();
 					}
+				} else {
+					Message errorMsg = mErrorHandler.obtainMessage(0);
+					errorMsg.obj = "建立FTP连接失败";
+					mErrorHandler.sendMessage(errorMsg);
 				}
 			}
 		}).start();
@@ -1244,6 +1352,16 @@ public class ItemDetailFragment extends Fragment implements Runnable {
 			File file = (File) msg.obj;
 			Log.d(">>>>>>>>>>", file + "");
 			showPlayDialog(file);
+		};
+	};
+
+	Handler mErrorHandler = new Handler() {
+		public void handleMessage(Message msg) {
+			if (progressDialog != null) {
+				progressDialog.dismiss();
+			}
+			String errorMsg = (String) msg.obj;
+			Toast.makeText(getActivity(), errorMsg, Toast.LENGTH_SHORT).show();
 		};
 	};
 
